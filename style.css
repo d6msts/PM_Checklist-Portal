@@ -1,0 +1,116 @@
+body{
+font-family:Cambria;
+background:#f5f5f5;
+margin:0;
+}
+
+/* REPORT CONTAINER */
+
+#report{
+width:1350px;
+margin:auto;
+background:white;
+padding:20px 30px;
+font-family:Cambria;
+position:relative;
+}
+
+/* HEADER */
+
+.header{
+display:flex;
+align-items:center;
+justify-content:center;
+gap:15px;
+margin-bottom:10px;
+}
+
+.logo{
+height:45px;
+}
+
+.titleBlock{
+text-align:center;
+}
+
+h2{
+text-align:center;
+margin:5px 0;
+font-size:22px;
+}
+
+h3{
+text-align:center;
+margin:0 0 10px 0;
+font-size:16px;
+}
+
+/* TABLE */
+
+table{
+border-collapse:collapse;
+width:100%;
+table-layout:fixed;
+margin-top:5px;
+}
+
+td,th{
+border:1px solid black;
+padding:6px;
+font-size:13px;
+vertical-align:middle;
+word-break:break-word;
+}
+
+th{
+background:#cfd8e6;
+font-weight:bold;
+}
+
+#checklistTable td:nth-child(5){
+white-space:normal;
+word-break:break-word;
+overflow-wrap:break-word;
+}
+
+#checklistTable{
+table-layout:fixed;
+}
+
+#checklistTable th:nth-child(1){width:5%;}
+#checklistTable th:nth-child(2){width:38%;}
+#checklistTable th:nth-child(3){width:18%;}
+#checklistTable th:nth-child(4){width:9%;}
+#checklistTable th:nth-child(5){width:30%;}
+
+/* BATTERY TABLE */
+
+.batteryTable th{
+background:#cfd8e6;
+text-align:center;
+}
+
+/* SIGNATURE SECTION */
+
+.signatureSection{
+display:flex;
+justify-content:space-between;
+margin-top:40px;
+text-align:center;
+}
+
+.signatureSection div{
+width:30%;
+}
+
+.signatureSection h4{
+margin-bottom:20px;
+}
+
+/* INPUT FIELDS */
+
+input,select{
+font-family:Cambria;
+font-size:13px;
+padding:2px 4px;
+}
