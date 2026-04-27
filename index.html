@@ -1773,7 +1773,7 @@ async function buildPDFDoc(){
     ["Plant","DEWA-VI","MO No.",mo,"PTW No.",ptw],
     ["Phase",phase,"MVPS",mvps,"Equipment",eq],
     ["Equip Sr No.",document.getElementById("equipSr").value||"-","Equip ID",equipId,"Frequency",freq],
-    ["PM Perform Date",date,"Start",document.getElementById("startTime").value||"-","Finish",document.getElementById("finishTime").value||"-"],
+    ["PM Date",date,"Start",document.getElementById("startTime").value||"-","Finish",document.getElementById("finishTime").value||"-"],
     ["In-Charge",maintIC,"Position",pos,"Reviewed By",rev]
   ];
   doc.autoTable({startY:cy,margin:{left:ML,right:MR},head:[],body:infoData,theme:"grid",
