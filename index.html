@@ -1783,20 +1783,39 @@ async function buildPDFDoc(){
   cy=doc.lastAutoTable.finalY+gapH;
 
   const isEarthPitsPDF = eq.toUpperCase().includes("EARTH");
-  // For Earth Pits, reserve extra space for ERT values table (~28mm) + remarks (~12mm)
+  // For Earth Pits, reserve extra space for ERT values table + remarks
   const ertReserve = isEarthPitsPDF ? 40 : 0;
-  const tableAreaH=PH-headerH-gapH-infoH-gapH-sigH-footerH-4-ertReserve;
+  // Use actual cy (post-info-table) for accurate available height
+  const sigY2 = PH - footerH - sigH - 1;
+  const tableAreaH = sigY2 - cy - gapH - ertReserve;
+
   const tableRows2 = useDCB
     ? dcbD.rows.map(function(r){return [r.sr,r.check,r.req,r.freq].concat(r.dcb).concat([r.remark]);})
     : rows.map(function(r){return [r.sr,r.check,r.req,r.freq,r.remark||"-"];});
-  const rowCount=tableRows2.length;
   const headRowH=6;
-  const maxRowH=(tableAreaH-headRowH)/rowCount;
-  let chosenFont=4.5,chosenPad=1.0;
-  const szs=[{f:7.5,p:1.8},{f:7.0,p:1.6},{f:6.5,p:1.5},{f:6.0,p:1.4},{f:5.5,p:1.3},{f:5.0,p:1.2},{f:4.5,p:1.0}];
-  for(var si=0;si<szs.length;si++){var s=szs[si];var estH=s.p*2+s.f*0.352+0.5;if(headRowH+rowCount*estH<=tableAreaH){chosenFont=s.f;chosenPad=s.p;break;}}
-  const usedByFont=chosenPad*2+chosenFont*0.352+0.5;
-  const minCH=Math.max(usedByFont,(tableAreaH-headRowH)/rowCount);
+  const remColW = useDCB ? 30 : (usableW - 7 - 9 - usableW*0.35 - usableW*0.27);
+
+  // Font size candidates — smallest 3.0 as hard floor
+  const szs=[{f:7.5,p:1.8},{f:7.0,p:1.6},{f:6.5,p:1.5},{f:6.0,p:1.4},{f:5.5,p:1.3},{f:5.0,p:1.2},{f:4.5,p:1.0},{f:4.0,p:0.9},{f:3.5,p:0.8},{f:3.0,p:0.7}];
+  var chosenFont=3.0, chosenPad=0.7;
+  for(var si=0;si<szs.length;si++){
+    var s=szs[si];
+    var lineH=s.f*0.352;
+    var charsPerLine=Math.max(1, remColW/(s.f*0.21));
+    var totalEstH=headRowH;
+    for(var ri=0;ri<tableRows2.length;ri++){
+      var remTxt=String(tableRows2[ri][tableRows2[ri].length-1]||"");
+      var estLines=Math.max(1,Math.ceil(remTxt.length/charsPerLine));
+      // also factor checkpoint col wrapping
+      var chkTxt=String(tableRows2[ri][1]||"");
+      var chkColW=useDCB?50:usableW*0.35;
+      var chkLines=Math.max(1,Math.ceil(chkTxt.length/Math.max(1,chkColW/(s.f*0.21))));
+      var rowLines=Math.max(estLines,chkLines);
+      totalEstH+=s.p*2+lineH*rowLines+0.3;
+    }
+    if(totalEstH<=tableAreaH){chosenFont=s.f;chosenPad=s.p;break;}
+  }
+  const minCH=chosenPad*2+chosenFont*0.352+0.5;
 
   var headCols, colStyles;
   if(useDCB){
@@ -1808,10 +1827,40 @@ async function buildPDFDoc(){
     headCols=[{content:"Sr",styles:{halign:"center"}},{content:"Check Point"},{content:"Requirement"},{content:"Freq",styles:{halign:"center"}},{content:"Remarks / Findings"}];
     colStyles={0:{halign:"center",cellWidth:srW},1:{cellWidth:checkW},2:{cellWidth:reqW},3:{halign:"center",cellWidth:freqW},4:{cellWidth:remW}};
   }
-  doc.autoTable({startY:cy,margin:{left:ML,right:MR},head:[headCols],body:tableRows2,theme:"striped",
-    headStyles:{fillColor:[10,22,40],textColor:[255,255,255],fontSize:chosenFont,fontStyle:"bold",cellPadding:chosenPad,minCellHeight:headRowH},
-    styles:{fontSize:chosenFont,cellPadding:chosenPad,overflow:"ellipsize",valign:"middle",lineColor:[220,225,235],lineWidth:0.18,minCellHeight:minCH},
-    columnStyles:colStyles,pageBreak:"avoid",rowPageBreak:"avoid",showHead:"firstPage"});
+
+  // Render table — if it still overruns sigY, shrink font one more step and redo
+  function renderChecklist(fSize, fPad){
+    var mCH=fPad*2+fSize*0.352+0.5;
+    doc.autoTable({startY:cy,margin:{left:ML,right:MR},head:[headCols],body:tableRows2,theme:"striped",
+      headStyles:{fillColor:[10,22,40],textColor:[255,255,255],fontSize:fSize,fontStyle:"bold",cellPadding:fPad,minCellHeight:headRowH},
+      styles:{fontSize:fSize,cellPadding:fPad,overflow:"linebreak",valign:"top",lineColor:[220,225,235],lineWidth:0.18,minCellHeight:mCH},
+      columnStyles:colStyles,pageBreak:"avoid",rowPageBreak:"avoid",showHead:"firstPage"});
+  }
+  renderChecklist(chosenFont, chosenPad);
+  // Safety retry: if finalY overruns signature area, shrink further
+  var retryIdx=szs.findIndex(function(x){return x.f===chosenFont;});
+  while(doc.lastAutoTable.finalY > sigY2 - gapH - 2 && retryIdx < szs.length-1){
+    retryIdx++;
+    // jsPDF doesn't support "undo" — reinit page and redraw from scratch
+    var newDoc=new jsPDF({orientation:orientation,unit:"mm",format:"a4"});
+    // Swap doc reference for remaining redraws
+    doc=newDoc;
+    // Redraw header
+    doc.setFillColor(255,255,255); doc.rect(0,0,PW,headerH,"F");
+    doc.setDrawColor(10,22,40); doc.setLineWidth(0.5); doc.line(0,headerH,PW,headerH);
+    doc.addImage(LOGO_B64,"PNG",ML,4,34,14,undefined,"FAST");
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(10,22,40);
+    doc.text("MBRSP-DEWA VI - 1800MW Solar PV Power Plant",PW/2,10,{align:"center"});
+    doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(10,80,140);
+    doc.text(eq+" - Preventive Maintenance Checklist",PW/2,17,{align:"center"});
+    // Redraw info table
+    doc.autoTable({startY:headerH+gapH,margin:{left:ML,right:MR},head:[],body:infoData,theme:"grid",
+      styles:{fontSize:7,cellPadding:1.4,textColor:[20,30,60]},
+      columnStyles:{0:{fontStyle:"bold",fillColor:[235,240,255],cellWidth:lW},1:{cellWidth:vW},2:{fontStyle:"bold",fillColor:[235,240,255],cellWidth:lW},3:{cellWidth:vW},4:{fontStyle:"bold",fillColor:[235,240,255],cellWidth:lW},5:{cellWidth:"auto"}},
+      tableLineColor:[203,213,225],tableLineWidth:0.25});
+    cy=doc.lastAutoTable.finalY+gapH;
+    renderChecklist(szs[retryIdx].f, szs[retryIdx].p);
+  }
   cy=doc.lastAutoTable.finalY+gapH;
 
   // Battery (not for Earth Pits)
